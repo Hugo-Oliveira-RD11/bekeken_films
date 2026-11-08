@@ -66,9 +66,24 @@ export interface UserMoviePatch {
   watchedAt?: string;
 }
 
+/**
+ * Seções da home (todas vêm das listas do TMDB):
+ * - nowPlaying:  em cartaz agora
+ * - mostWatched: mais populares (a popularidade do TMDB mistura visualizações, votos e "quero ver")
+ * - topRated:    mais gostados (maiores notas dos usuários do TMDB)
+ * - trending:    em alta na semana
+ */
+export type HomeSectionKey = 'nowPlaying' | 'mostWatched' | 'topRated' | 'trending';
+
+export interface HomeSection {
+  key: HomeSectionKey;
+  movies: MovieSummary[];
+}
+
 export interface HomeResponse {
   featured: MovieSummary | null;
-  nowPlaying: MovieSummary[];
+  /** Só as seções que carregaram e têm filmes, na ordem de exibição. */
+  sections: HomeSection[];
 }
 
 export interface DetailsResponse {

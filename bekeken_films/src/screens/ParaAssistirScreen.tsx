@@ -40,7 +40,7 @@ export function ParaAssistirScreen() {
       {list.loading && <Loading />}
       {list.error && !list.data && <ErrorBox message={list.error} onRetry={list.reload} />}
       {list.data && movies.length === 0 && (
-        <EmptyState icon="bookmark-outline" text="Nada guardado ainda. Toque em “Quero ver” em qualquer filme." />
+        <EmptyState icon="bookmark-border" text="Nada guardado ainda. Toque em “Quero ver” em qualquer filme." />
       )}
       <View style={styles.grid}>
         {movies.map((m) => (
@@ -101,7 +101,7 @@ export function ParaAssistirScreen() {
             ))}
           </View>
           {recs.data.items.length === 0 && (
-            <EmptyState icon="sparkles-outline" text="Sem sugestões por enquanto." />
+            <EmptyState icon="auto-awesome" text="Sem sugestões por enquanto." />
           )}
         </>
       )}

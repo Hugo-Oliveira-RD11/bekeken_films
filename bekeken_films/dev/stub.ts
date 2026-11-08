@@ -51,11 +51,13 @@ export interface Stub {
   /** Caminhos chamados, na ordem (ex.: "/movie/101", "/title/9101/sources/"). */
   calls: string[];
   failing: boolean;
+  /** Se definido, só os caminhos que casarem com isso falham (erro 500). */
+  failOn: RegExp | null;
   close(): Promise<void>;
 }
 
 export async function startStub(port = 0): Promise<Stub> {
-  const stub = { url: '', calls: [] as string[], failing: false } as Stub;
+  const stub = { url: '', calls: [] as string[], failing: false, failOn: null } as Stub;
   const json = (res: import('node:http').ServerResponse, body: unknown, status = 200) => {
     res.writeHead(status, { 'content-type': 'application/json' });
     res.end(JSON.stringify(body));
@@ -98,7 +100,7 @@ export async function startStub(port = 0): Promise<Stub> {
     }
 
     stub.calls.push(path);
-    if (stub.failing) return json(res, { status_message: 'stub falhando' }, 500);
+    if (stub.failing || stub.failOn?.test(path)) return json(res, { status_message: 'stub falhando' }, 500);
 
     const isWm = path.startsWith('/wm/');
     const key = url.searchParams.get(isWm ? 'apiKey' : 'api_key');

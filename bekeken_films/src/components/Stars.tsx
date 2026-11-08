@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from './Icon';
 import { colors } from '../theme';
 
 type Props = { rating: number; size?: number; gap?: number };
@@ -10,10 +10,10 @@ export function Stars({ rating, size = 16, gap = 2 }: Props) {
     <View style={[styles.row, { gap }]} accessibilityLabel={`Nota ${rating} de 5`}>
       {[1, 2, 3, 4, 5].map((i) => {
         const name =
-          rating >= i ? 'star' : rating >= i - 0.5 ? 'star-half' : 'star-outline';
-        const filled = name !== 'star-outline';
+          rating >= i ? 'star' : rating >= i - 0.5 ? 'star-half' : 'star-border';
+        const filled = name !== 'star-border';
         return (
-          <Ionicons
+          <Icon
             key={i}
             name={name}
             size={size}

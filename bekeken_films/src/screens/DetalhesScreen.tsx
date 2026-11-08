@@ -12,7 +12,7 @@ import {
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../components/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { api } from '../api/client';
@@ -95,7 +95,7 @@ export function DetalhesScreen({ route, navigation }: Props) {
             accessibilityLabel="Voltar"
             hitSlop={12}
           >
-            <Ionicons name="arrow-back" size={18} color={colors.creamBright} />
+            <Icon name="arrow-back" size={18} color={colors.creamBright} />
             <Text style={styles.backText}>Voltar</Text>
           </Pressable>
 
@@ -134,7 +134,7 @@ export function DetalhesScreen({ route, navigation }: Props) {
                   <View style={styles.actions}>
                     <PrimaryButton
                       label={user.status === 'watched' ? 'Assistido' : 'Já assisti'}
-                      icon={user.status === 'watched' ? 'checkmark-circle' : 'eye'}
+                      icon={user.status === 'watched' ? 'check-circle' : 'visibility'}
                       onPress={() => update({ status: user.status === 'watched' ? null : 'watched' })}
                     />
                     <SecondaryButton
@@ -144,7 +144,7 @@ export function DetalhesScreen({ route, navigation }: Props) {
                       onPress={() => update({ status: user.status === 'watchlist' ? null : 'watchlist' })}
                     />
                     <IconButton
-                      icon={user.liked ? 'heart' : 'heart-outline'}
+                      icon={user.liked ? 'favorite' : 'favorite-border'}
                       active={user.liked}
                       label={user.liked ? 'Descurtir' : 'Curtir'}
                       onPress={() => update({ liked: !user.liked })}
@@ -271,7 +271,7 @@ function WhereToWatch({ info }: { info: WatchmodeInfo }) {
       </View>
       {message ? (
         <View style={styles.infoBox}>
-          <Ionicons name="tv-outline" size={20} color={colors.textMuted} />
+          <Icon name="tv" size={20} color={colors.textMuted} />
           <Text style={styles.infoText}>{message}</Text>
         </View>
       ) : (
@@ -310,7 +310,7 @@ function SourceRow({ source, region }: { source: StreamingSource; region: string
       )}
       <Text style={styles.sourceName}>{source.name}</Text>
       {detail ? <Text style={styles.sourceDetail}>{detail}</Text> : null}
-      {source.webUrl && <Ionicons name="open-outline" size={16} color={colors.textMuted} />}
+      {source.webUrl && <Icon name="open-in-new" size={16} color={colors.textMuted} />}
     </Pressable>
   );
 }
@@ -338,7 +338,7 @@ function Notes({ note, onSave }: { note: string; onSave: (note: string) => Promi
       <View style={styles.sectionHeader}>
         <Eyebrow>Minhas anotações</Eyebrow>
         <View style={styles.privateTag}>
-          <Ionicons name="lock-closed" size={11} color={colors.textMuted} />
+          <Icon name="lock" size={11} color={colors.textMuted} />
           <Text style={styles.small}>só você vê</Text>
         </View>
       </View>

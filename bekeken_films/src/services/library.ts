@@ -2,6 +2,7 @@ import type {
   Algorithm,
   DetailsResponse,
   HomeResponse,
+  HomeSectionKey,
   MovieDetails,
   MovieSummary,
   RecommendationsResponse,
@@ -13,7 +14,7 @@ import { Cache } from './cache';
 import type { Config } from './config';
 import { ALGORITHMS, recommend, type Signal } from './recommend';
 import type { KeyValueStore } from './storage';
-import { Tmdb } from './tmdb';
+import { Tmdb, type ListKind } from './tmdb';
 import { UserData, ValidationError } from './userdata';
 import { Watchmode } from './watchmode';
 
@@ -60,16 +61,38 @@ export function createLibrary(cfg: Config, store: KeyValueStore, opts: LibraryOp
     /** Limpeza periódica do cache antigo (chamar ao abrir o app). */
     prune: () => cache.prune(),
 
+    /**
+     * Home: destaque + seções. Cada lista é independente: se uma falhar, as outras
+     * continuam aparecendo (só dá erro se TODAS falharem). Tudo passa pelo cache.
+     */
     async home(): Promise<HomeResponse> {
-      const [nowPlaying, trending] = await Promise.all([tmdb.list('now_playing'), tmdb.list('trending')]);
+      const sources: [HomeSectionKey, ListKind][] = [
+        ['nowPlaying', 'now_playing'],
+        ['mostWatched', 'popular'],
+        ['topRated', 'top_rated'],
+        ['trending', 'trending'],
+      ];
+      const settled = await Promise.allSettled(sources.map(([, kind]) => tmdb.list(kind)));
+      const lists = new Map<HomeSectionKey, MovieSummary[]>();
+      let failure: unknown;
+      settled.forEach((r, i) => {
+        if (r.status === 'fulfilled') lists.set(sources[i][0], r.value);
+        else failure ??= r.reason;
+      });
+      if (lists.size === 0) throw failure;
+
       const featured =
-        trending.find((m) => m.backdropUrl && m.overview) ??
-        nowPlaying.find((m) => m.backdropUrl && m.overview) ??
-        null;
-      return {
-        featured,
-        nowPlaying: nowPlaying.filter((m) => m.id !== featured?.id && m.posterUrl),
-      };
+        [lists.get('trending'), lists.get('nowPlaying'), lists.get('mostWatched')]
+          .flatMap((l) => l ?? [])
+          .find((m) => m.backdropUrl && m.overview) ?? null;
+
+      const sections = sources
+        .map(([key]) => ({
+          key,
+          movies: (lists.get(key) ?? []).filter((m) => m.id !== featured?.id && m.posterUrl),
+        }))
+        .filter((s) => s.movies.length > 0);
+      return { featured, sections };
     },
 
     async search(query: string): Promise<{ results: MovieSummary[] }> {

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from './Icon';
 import { colors } from '../theme';
 
 type Props = {
@@ -21,13 +21,13 @@ export function RatingInput({ value, onChange, size = 30 }: Props) {
   return (
     <View style={styles.row} accessibilityLabel={value ? `Sua nota: ${value} de 5` : 'Sem nota'}>
       {[1, 2, 3, 4, 5].map((i) => {
-        const name = v >= i ? 'star' : v >= i - 0.5 ? 'star-half' : 'star-outline';
+        const name = v >= i ? 'star' : v >= i - 0.5 ? 'star-half' : 'star-border';
         return (
           <Pressable key={i} onPress={() => press(i)} hitSlop={4} accessibilityRole="button">
-            <Ionicons
+            <Icon
               name={name}
               size={size}
-              color={name === 'star-outline' ? colors.textDim : colors.gold}
+              color={name === 'star-border' ? colors.textDim : colors.gold}
             />
           </Pressable>
         );

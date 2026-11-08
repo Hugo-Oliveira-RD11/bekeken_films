@@ -3,7 +3,7 @@ import { FlatList, ImageBackground, StyleSheet, Text, View } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { api } from '../api/client';
-import type { MovieSummary } from '../api/types';
+import type { HomeSectionKey, MovieSummary } from '../api/types';
 import { useApi } from '../api/useApi';
 import { PrimaryButton, SecondaryButton } from '../components/Buttons';
 import { Eyebrow } from '../components/Eyebrow';
@@ -52,12 +52,12 @@ function Hero({ movie }: { movie: MovieSummary }) {
         <View style={styles.buttons}>
           <PrimaryButton
             label="Ver detalhes"
-            icon="play"
+            icon="play-arrow"
             onPress={() => navigation.navigate('Detalhes', { movieId: movie.id })}
           />
           <SecondaryButton
             label={saved ? 'Na lista' : 'Quero ver'}
-            icon={saved ? 'checkmark' : 'add'}
+            icon={saved ? 'check' : 'add'}
             onPress={save}
             disabled={saving || saved}
           />
@@ -74,27 +74,38 @@ export function FilmesScreen() {
     <Screen hero={data?.featured ? <Hero movie={data.featured} /> : undefined} padded={false}>
       {loading && <Loading />}
       {error && !data && <ErrorBox message={error} onRetry={reload} />}
-      {data && (
-        <View style={styles.section}>
-          <Eyebrow style={styles.sectionLabel}>Em cartaz</Eyebrow>
-          {data.nowPlaying.length === 0 ? (
-            <EmptyState icon="film-outline" text="Nenhum filme em cartaz agora." />
-          ) : (
-            <FlatList
-              data={data.nowPlaying}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              keyExtractor={(m) => String(m.id)}
-              contentContainerStyle={styles.list}
-              ItemSeparatorComponent={() => <View style={{ width: 14 }} />}
-              renderItem={({ item }) => <MovieCard movie={item} style={styles.card} />}
-            />
-          )}
-        </View>
+      {data && data.sections.length === 0 && (
+        <EmptyState icon="movie" text="Nenhum filme para mostrar agora." />
       )}
+      {data?.sections.map((section) => (
+        <View key={section.key} style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Eyebrow>{SECTION_TEXT[section.key].title}</Eyebrow>
+            <Text style={styles.sectionHint}>{SECTION_TEXT[section.key].hint}</Text>
+          </View>
+          <FlatList
+            data={section.movies}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyExtractor={(m) => String(m.id)}
+            contentContainerStyle={styles.list}
+            ItemSeparatorComponent={() => <View style={{ width: 14 }} />}
+            renderItem={({ item }) => <MovieCard movie={item} style={styles.card} />}
+          />
+        </View>
+      ))}
     </Screen>
   );
 }
+
+// Títulos das seções. O TMDB não informa "quantas vezes foi assistido", então
+// "Mais assistidos" usa a popularidade dele e "Mais gostados" as maiores notas.
+const SECTION_TEXT: Record<HomeSectionKey, { title: string; hint: string }> = {
+  nowPlaying: { title: 'Em cartaz', hint: 'nos cinemas agora' },
+  mostWatched: { title: 'Mais assistidos', hint: 'popularidade no TMDB' },
+  topRated: { title: 'Mais gostados', hint: 'maiores notas no TMDB' },
+  trending: { title: 'Em alta', hint: 'esta semana' },
+};
 
 const styles = StyleSheet.create({
   hero: { minHeight: 540, justifyContent: 'flex-end' },
@@ -124,8 +135,14 @@ const styles = StyleSheet.create({
     lineHeight: 25,
   },
   buttons: { flexDirection: 'row', gap: 12, marginTop: 6, flexWrap: 'wrap' },
-  section: { gap: 16, paddingTop: 8 },
-  sectionLabel: { paddingHorizontal: spacing.screen },
+  section: { gap: 16, paddingTop: 8, marginBottom: 20 },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.screen,
+  },
+  sectionHint: { color: colors.textDim, fontFamily: fonts.sans, fontSize: 12 },
   list: { paddingHorizontal: spacing.screen },
   card: { width: 150 },
 });

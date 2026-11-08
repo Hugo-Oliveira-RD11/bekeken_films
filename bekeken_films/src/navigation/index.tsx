@@ -8,7 +8,7 @@ import {
 } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon, type IconName } from '../components/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FilmesScreen } from '../screens/FilmesScreen';
 import { AssistidosScreen } from '../screens/AssistidosScreen';
@@ -54,8 +54,6 @@ const linking: LinkingOptions<RootStackParamList> = {
   },
 };
 
-type IconName = keyof typeof Ionicons.glyphMap;
-
 const tabs: {
   name: keyof TabParamList;
   label: string;
@@ -63,9 +61,10 @@ const tabs: {
   iconActive: IconName;
   component: React.ComponentType;
 }[] = [
-  { name: 'Filmes', label: 'Filmes', icon: 'film-outline', iconActive: 'film', component: FilmesScreen },
-  { name: 'Assistidos', label: 'Assistidos', icon: 'eye-outline', iconActive: 'eye', component: AssistidosScreen },
-  { name: 'ParaAssistir', label: 'Para assistir', icon: 'bookmark-outline', iconActive: 'bookmark', component: ParaAssistirScreen },
+  // Material Icons. Aba ativa = ícone preenchido (+ cor dourada); inativa = contorno.
+  { name: 'Filmes', label: 'Filmes', icon: 'movie', iconActive: 'movie', component: FilmesScreen },
+  { name: 'Assistidos', label: 'Assistidos', icon: 'check-circle-outline', iconActive: 'check-circle', component: AssistidosScreen },
+  { name: 'ParaAssistir', label: 'Para assistir', icon: 'bookmark-border', iconActive: 'bookmark', component: ParaAssistirScreen },
 ];
 
 function Tabs() {
@@ -93,7 +92,7 @@ function Tabs() {
             title: t.label,
             tabBarIcon: ({ focused, color }) => (
               <View style={[styles.iconPill, focused && styles.iconPillActive]}>
-                <Ionicons name={focused ? t.iconActive : t.icon} size={24} color={color} />
+                <Icon name={focused ? t.iconActive : t.icon} size={26} color={color} />
               </View>
             ),
           }}

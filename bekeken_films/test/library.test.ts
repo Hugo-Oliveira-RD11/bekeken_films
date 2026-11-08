@@ -142,13 +142,57 @@ test('sem internet: mensagem amigável', async () => {
   await assert.rejects(lib.home(), /Sem conexão com a internet/);
 });
 
-test('home e busca (e repetir não chama o TMDB)', async () => {
-  const lib = make();
-  const home = await lib.home();
+test('home: destaque + 4 seções, sem repetir o destaque dentro delas', async () => {
+  const home = await make().home();
   assert.ok(home.featured?.backdropUrl);
-  assert.ok(home.nowPlaying.length > 0);
-  assert.ok(!home.nowPlaying.some((m) => m.id === home.featured!.id));
-  assert.ok(home.nowPlaying[0].genres.length > 0);
+  assert.deepEqual(home.sections.map((s) => s.key), ['nowPlaying', 'mostWatched', 'topRated', 'trending']);
+  for (const s of home.sections) {
+    assert.ok(s.movies.length > 0, s.key);
+    assert.ok(!s.movies.some((m) => m.id === home.featured!.id), `${s.key} repete o destaque`);
+    assert.ok(s.movies.every((m) => m.posterUrl));
+  }
+  assert.ok(home.sections[0].movies[0].genres.length > 0);
+  // "Mais gostados" vem ordenado pelas maiores notas
+  const top = home.sections.find((s) => s.key === 'topRated')!.movies;
+  assert.deepEqual(top.map((m) => m.voteAverage), [...top.map((m) => m.voteAverage)].sort((a, b) => b - a));
+});
+
+test('home: se uma lista falhar, as outras continuam aparecendo', async () => {
+  stub.failOn = /top_rated/;
+  try {
+    const home = await make().home();
+    assert.deepEqual(home.sections.map((s) => s.key), ['nowPlaying', 'mostWatched', 'trending']);
+    assert.ok(home.featured);
+  } finally {
+    stub.failOn = null;
+  }
+});
+
+test('home: se TODAS as listas falharem (e sem cache), dá erro', async () => {
+  stub.failing = true;
+  try {
+    await assert.rejects(make().home(), (e: unknown) => e instanceof HttpError);
+  } finally {
+    stub.failing = false;
+  }
+});
+
+test('home com cache vencido e API fora: continua mostrando as seções', async () => {
+  const lib = make();
+  await lib.home();
+  clock += 31 * DAY;
+  stub.failing = true;
+  try {
+    assert.equal((await lib.home()).sections.length, 4);
+  } finally {
+    stub.failing = false;
+    clock -= 31 * DAY;
+  }
+});
+
+test('busca (e repetir home/busca não chama o TMDB)', async () => {
+  const lib = make();
+  await lib.home();
 
   const found = await lib.search('Farol');
   assert.deepEqual(found.results.map((m) => m.id), [104]);

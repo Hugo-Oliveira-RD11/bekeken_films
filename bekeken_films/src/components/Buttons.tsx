@@ -1,12 +1,12 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon, type IconName } from './Icon';
 import { colors, fonts, radius } from '../theme';
 
 type Props = {
   label: string;
-  icon?: keyof typeof Ionicons.glyphMap;
+  icon?: IconName;
   onPress?: () => void;
   disabled?: boolean;
 };
@@ -24,7 +24,7 @@ export function PrimaryButton({ label, icon, onPress, disabled }: Props) {
         end={{ x: 1, y: 1 }}
         style={styles.btn}
       >
-        {icon && <Ionicons name={icon} size={16} color="#2A130E" />}
+        {icon && <Icon name={icon} size={16} color="#2A130E" />}
         <Text style={[styles.label, { color: '#2A130E' }]}>{label}</Text>
       </LinearGradient>
     </Pressable>
@@ -39,7 +39,7 @@ export function SecondaryButton({ label, icon, onPress, disabled }: Props) {
       style={({ pressed }) => [styles.press, (pressed || disabled) && styles.pressed]}
     >
       <View style={[styles.btn, styles.outline]}>
-        {icon && <Ionicons name={icon} size={16} color={colors.text} />}
+        {icon && <Icon name={icon} size={16} color={colors.text} />}
         <Text style={[styles.label, { color: colors.text }]}>{label}</Text>
       </View>
     </Pressable>
@@ -53,7 +53,7 @@ export function IconButton({
   onPress,
   label,
 }: {
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: IconName;
   active?: boolean;
   onPress?: () => void;
   label: string;
@@ -64,7 +64,7 @@ export function IconButton({
       accessibilityLabel={label}
       style={({ pressed }) => [styles.icon, active && styles.iconActive, pressed && styles.pressed]}
     >
-      <Ionicons name={icon} size={18} color={active ? colors.danger : colors.text} />
+      <Icon name={icon} size={18} color={active ? colors.danger : colors.text} />
     </Pressable>
   );
 }

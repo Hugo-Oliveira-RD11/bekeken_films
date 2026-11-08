@@ -1,6 +1,6 @@
 import React from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon, type IconName } from './Icon';
 import { colors, fonts, radius } from '../theme';
 
 export function Loading() {
@@ -14,7 +14,7 @@ export function Loading() {
 export function ErrorBox({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
     <View style={styles.box}>
-      <Ionicons name="cloud-offline-outline" size={36} color={colors.textMuted} />
+      <Icon name="cloud-off" size={36} color={colors.textMuted} />
       <Text style={styles.text}>{message}</Text>
       {onRetry && (
         <Pressable onPress={onRetry} style={styles.retry}>
@@ -25,10 +25,10 @@ export function ErrorBox({ message, onRetry }: { message: string; onRetry?: () =
   );
 }
 
-export function EmptyState({ icon, text }: { icon: keyof typeof Ionicons.glyphMap; text: string }) {
+export function EmptyState({ icon, text }: { icon: IconName; text: string }) {
   return (
     <View style={styles.box}>
-      <Ionicons name={icon} size={36} color={colors.textDim} />
+      <Icon name={icon} size={36} color={colors.textDim} />
       <Text style={styles.text}>{text}</Text>
     </View>
   );

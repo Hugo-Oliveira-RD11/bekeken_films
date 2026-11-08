@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '../components/Icon';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api } from '../api/client';
@@ -59,10 +59,10 @@ export function BuscarScreen() {
       />
       <View style={[styles.bar, { paddingTop: insets.top + 10 }]}>
         <Pressable onPress={() => navigation.goBack()} hitSlop={12} accessibilityLabel="Voltar">
-          <Ionicons name="chevron-back" size={24} color={colors.creamBright} />
+          <Icon name="arrow-back" size={24} color={colors.creamBright} />
         </Pressable>
         <View style={styles.input}>
-          <Ionicons name="search" size={16} color={colors.textMuted} />
+          <Icon name="search" size={16} color={colors.textMuted} />
           <TextInput
             value={query}
             onChangeText={setQuery}
@@ -75,7 +75,7 @@ export function BuscarScreen() {
           />
           {query.length > 0 && (
             <Pressable onPress={() => setQuery('')} hitSlop={10} accessibilityLabel="Limpar">
-              <Ionicons name="close-circle" size={18} color={colors.textMuted} />
+              <Icon name="cancel" size={18} color={colors.textMuted} />
             </Pressable>
           )}
         </View>
@@ -87,10 +87,10 @@ export function BuscarScreen() {
         {loading && <Loading />}
         {error && <ErrorBox message={error} />}
         {!loading && !error && results === null && (
-          <EmptyState icon="search-outline" text="Digite o nome de um filme para buscar." />
+          <EmptyState icon="search" text="Digite o nome de um filme para buscar." />
         )}
         {!loading && !error && results?.length === 0 && (
-          <EmptyState icon="film-outline" text={`Nada encontrado para “${query.trim()}”.`} />
+          <EmptyState icon="movie" text={`Nada encontrado para “${query.trim()}”.`} />
         )}
         {!loading && !error && results && results.length > 0 && (
           <View style={styles.grid}>

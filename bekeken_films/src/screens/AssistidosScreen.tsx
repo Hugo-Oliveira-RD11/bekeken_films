@@ -62,7 +62,7 @@ export function AssistidosScreen() {
 
           {groups.length === 0 && (
             <EmptyState
-              icon="eye-outline"
+              icon="visibility"
               text="Você ainda não marcou nenhum filme como assistido. Abra um filme e toque em “Assistido”."
             />
           )}

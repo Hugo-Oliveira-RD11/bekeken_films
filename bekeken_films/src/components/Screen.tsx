@@ -1,7 +1,7 @@
 import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from './Icon';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, fonts, radius, spacing } from '../theme';
@@ -35,7 +35,7 @@ export function Screen({ children, padded = true, hero }: Props) {
           accessibilityRole="search"
           accessibilityLabel="Buscar filmes"
         >
-          <Ionicons name="search" size={15} color={colors.textMuted} />
+          <Icon name="search" size={15} color={colors.textMuted} />
           <Text style={styles.searchText}>Buscar filmes...</Text>
         </Pressable>
       </View>
