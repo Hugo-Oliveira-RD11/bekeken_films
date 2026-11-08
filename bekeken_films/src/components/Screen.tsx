@@ -1,36 +1,45 @@
 import React from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, spacing } from '../theme';
+import { colors, fonts, radius, spacing } from '../theme';
 import { Logo } from './Logo';
 
 type Props = {
   children: React.ReactNode;
-  // Se true, a tela rola e o conteúdo recebe o padding lateral padrão.
+  // Se false, o conteúdo não recebe o padding lateral padrão.
   padded?: boolean;
-  // Conteúdo extra por cima do fundo (ex.: hero de imagem).
+  // Conteúdo no topo da rolagem, de ponta a ponta (ex.: hero com imagem).
   hero?: React.ReactNode;
 };
 
-// Moldura comum das abas: fundo com brilho quente, barra superior com logo
+// Moldura comum das abas: fundo com brilho quente, barra superior (logo + busca)
 // e rolagem. A navegação fica na barra inferior.
 export function Screen({ children, padded = true, hero }: Props) {
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation();
   return (
     <View style={styles.root}>
       <LinearGradient
-        colors={['#2A120E', colors.bg, '#0E0707']}
-        locations={[0, 0.45, 1]}
+        colors={[colors.bgTop, colors.bg, colors.bgBottom]}
+        locations={[0, 0.4, 1]}
         style={StyleSheet.absoluteFill}
       />
       <View style={[styles.topBar, { paddingTop: insets.top + 10 }]}>
         <Logo />
+        <Pressable
+          onPress={() => navigation.navigate('Buscar')}
+          style={styles.search}
+          accessibilityRole="search"
+          accessibilityLabel="Buscar filmes"
+        >
+          <Ionicons name="search" size={15} color={colors.textMuted} />
+          <Text style={styles.searchText}>Buscar filmes...</Text>
+        </Pressable>
       </View>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.content}
-      >
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
         {hero}
         <View style={padded ? styles.padded : undefined}>{children}</View>
       </ScrollView>
@@ -41,12 +50,27 @@ export function Screen({ children, padded = true, hero }: Props) {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: spacing.screen,
     paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
-    backgroundColor: 'rgba(20,10,10,0.85)',
+    backgroundColor: 'rgba(42,19,14,0.9)',
   },
+  search: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.pill,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    backgroundColor: 'rgba(58,29,21,0.6)',
+  },
+  searchText: { color: colors.textMuted, fontFamily: fonts.sans, fontSize: 13 },
   content: { paddingBottom: 32 },
   padded: { paddingHorizontal: spacing.screen },
 });

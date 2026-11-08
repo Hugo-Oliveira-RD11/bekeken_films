@@ -14,6 +14,7 @@ import { FilmesScreen } from '../screens/FilmesScreen';
 import { AssistidosScreen } from '../screens/AssistidosScreen';
 import { ParaAssistirScreen } from '../screens/ParaAssistirScreen';
 import { DetalhesScreen } from '../screens/DetalhesScreen';
+import { BuscarScreen } from '../screens/BuscarScreen';
 import { colors, fonts, radius } from '../theme';
 import type { RootStackParamList, TabParamList } from './types';
 
@@ -44,7 +45,11 @@ const linking: LinkingOptions<RootStackParamList> = {
           ParaAssistir: 'para-assistir',
         },
       },
-      Detalhes: 'filme/:movieId',
+      Buscar: 'buscar',
+      Detalhes: {
+        path: 'filme/:movieId',
+        parse: { movieId: Number },
+      },
     },
   },
 };
@@ -88,7 +93,7 @@ function Tabs() {
             title: t.label,
             tabBarIcon: ({ focused, color }) => (
               <View style={[styles.iconPill, focused && styles.iconPillActive]}>
-                <Ionicons name={focused ? t.iconActive : t.icon} size={22} color={color} />
+                <Ionicons name={focused ? t.iconActive : t.icon} size={24} color={color} />
               </View>
             ),
           }}
@@ -109,6 +114,7 @@ export function RootNavigator() {
         }}
       >
         <Stack.Screen name="Tabs" component={Tabs} />
+        <Stack.Screen name="Buscar" component={BuscarScreen} />
         <Stack.Screen name="Detalhes" component={DetalhesScreen} />
       </Stack.Navigator>
     </NavigationContainer>

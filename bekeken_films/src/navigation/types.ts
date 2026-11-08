@@ -8,7 +8,8 @@ export type TabParamList = {
 
 export type RootStackParamList = {
   Tabs: NavigatorScreenParams<TabParamList> | undefined;
-  Detalhes: { movieId: string };
+  Buscar: undefined;
+  Detalhes: { movieId: number };
 };
 
 declare global {

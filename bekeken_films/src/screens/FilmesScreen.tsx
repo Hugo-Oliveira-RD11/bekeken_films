@@ -1,96 +1,103 @@
-import React from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import { FlatList, ImageBackground, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
-import { Screen } from '../components/Screen';
-import { Eyebrow } from '../components/Eyebrow';
-import { Stars } from '../components/Stars';
-import { TomatoScore } from '../components/TomatoScore';
-import { Poster } from '../components/Poster';
+import { api } from '../api/client';
+import type { MovieSummary } from '../api/types';
+import { useApi } from '../api/useApi';
 import { PrimaryButton, SecondaryButton } from '../components/Buttons';
-import { featuredId, getMovie, movies } from '../data/movies';
+import { Eyebrow } from '../components/Eyebrow';
+import { MovieCard } from '../components/MovieCard';
+import { ScoreBadge } from '../components/ScoreBadge';
+import { Screen } from '../components/Screen';
+import { Stars } from '../components/Stars';
+import { EmptyState, ErrorBox, Loading } from '../components/States';
 import { colors, fonts, spacing } from '../theme';
 
-export function FilmesScreen() {
+function Hero({ movie }: { movie: MovieSummary }) {
   const navigation = useNavigation();
-  const featured = getMovie(featuredId);
-  const inTheaters = movies.filter((m) => m.id !== featuredId);
+  const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  const hero = (
-    <View style={styles.hero}>
-      {/* "sala de cinema" estilizada: fundo quente com vinheta */}
+  const save = async () => {
+    setSaving(true);
+    try {
+      await api.updateMovie(movie.id, { status: 'watchlist' });
+      setSaved(true);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <ImageBackground source={movie.backdropUrl ? { uri: movie.backdropUrl } : undefined} style={styles.hero}>
       <LinearGradient
-        colors={['#3B1C12', '#2A130E', '#140A0A']}
-        style={StyleSheet.absoluteFill}
-      />
-      <LinearGradient
-        colors={['rgba(201,162,75,0.28)', 'transparent']}
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 0.7 }}
-        style={StyleSheet.absoluteFill}
-      />
-      <LinearGradient
-        colors={['transparent', colors.bg]}
-        locations={[0.35, 1]}
+        colors={['rgba(78,34,16,0.55)', 'rgba(42,19,14,0.55)', colors.bg]}
+        locations={[0, 0.45, 1]}
         style={StyleSheet.absoluteFill}
       />
       <View style={styles.heroContent}>
         <Eyebrow>Destaque da semana</Eyebrow>
-        <Text style={styles.heroTitle}>{featured.title}</Text>
+        <Text style={styles.heroTitle}>{movie.title}</Text>
         <Text style={styles.heroMeta}>
-          {`${featured.year} · ${featured.director} · ${featured.duration}`.toUpperCase()}
+          {[movie.year, movie.genres.slice(0, 2).join(' / ')].filter(Boolean).join(' · ').toUpperCase()}
         </Text>
         <View style={styles.ratingRow}>
-          <Stars rating={featured.rating} size={20} gap={3} />
-          <TomatoScore score={featured.tomato} size={15} />
+          <Stars rating={movie.voteAverage / 2} size={20} gap={3} />
+          <ScoreBadge voteAverage={movie.voteAverage} size={15} />
         </View>
-        <Text style={styles.synopsis}>{featured.synopsis}</Text>
+        <Text style={styles.synopsis} numberOfLines={4}>
+          {movie.overview}
+        </Text>
         <View style={styles.buttons}>
           <PrimaryButton
             label="Ver detalhes"
             icon="play"
-            onPress={() => navigation.navigate('Detalhes', { movieId: featured.id })}
+            onPress={() => navigation.navigate('Detalhes', { movieId: movie.id })}
           />
-          <SecondaryButton label="Quero ver" icon="add" />
+          <SecondaryButton
+            label={saved ? 'Na lista' : 'Quero ver'}
+            icon={saved ? 'checkmark' : 'add'}
+            onPress={save}
+            disabled={saving || saved}
+          />
         </View>
       </View>
-    </View>
+    </ImageBackground>
   );
+}
+
+export function FilmesScreen() {
+  const { data, error, loading, reload } = useApi(() => api.home());
 
   return (
-    <Screen hero={hero} padded={false}>
-      <View style={styles.section}>
-        <Eyebrow style={styles.sectionLabel}>Em cartaz</Eyebrow>
-        <FlatList
-          data={inTheaters}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          keyExtractor={(m) => m.id}
-          contentContainerStyle={styles.list}
-          ItemSeparatorComponent={() => <View style={{ width: 14 }} />}
-          renderItem={({ item }) => (
-            <Pressable
-              style={styles.card}
-              onPress={() => navigation.navigate('Detalhes', { movieId: item.id })}
-            >
-              <Poster movie={item} />
-              <Text style={styles.cardTitle} numberOfLines={1}>
-                {item.title}
-              </Text>
-              <View style={styles.cardRating}>
-                <Stars rating={item.rating} size={12} gap={1} />
-                <TomatoScore score={item.tomato} size={12} />
-              </View>
-            </Pressable>
+    <Screen hero={data?.featured ? <Hero movie={data.featured} /> : undefined} padded={false}>
+      {loading && <Loading />}
+      {error && !data && <ErrorBox message={error} onRetry={reload} />}
+      {data && (
+        <View style={styles.section}>
+          <Eyebrow style={styles.sectionLabel}>Em cartaz</Eyebrow>
+          {data.nowPlaying.length === 0 ? (
+            <EmptyState icon="film-outline" text="Nenhum filme em cartaz agora." />
+          ) : (
+            <FlatList
+              data={data.nowPlaying}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              keyExtractor={(m) => String(m.id)}
+              contentContainerStyle={styles.list}
+              ItemSeparatorComponent={() => <View style={{ width: 14 }} />}
+              renderItem={({ item }) => <MovieCard movie={item} style={styles.card} />}
+            />
           )}
-        />
-      </View>
+        </View>
+      )}
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  hero: { minHeight: 520, justifyContent: 'flex-end' },
+  hero: { minHeight: 540, justifyContent: 'flex-end' },
   heroContent: {
     paddingHorizontal: spacing.screen,
     paddingTop: 70,
@@ -98,10 +105,10 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   heroTitle: {
-    color: colors.cream,
+    color: colors.creamBright,
     fontFamily: fonts.serif,
-    fontSize: 60,
-    lineHeight: 64,
+    fontSize: 54,
+    lineHeight: 58,
   },
   heroMeta: {
     color: colors.textMuted,
@@ -113,20 +120,12 @@ const styles = StyleSheet.create({
   synopsis: {
     color: colors.text,
     fontFamily: fonts.sans,
-    fontSize: 17,
-    lineHeight: 26,
-    opacity: 0.9,
+    fontSize: 16,
+    lineHeight: 25,
   },
   buttons: { flexDirection: 'row', gap: 12, marginTop: 6, flexWrap: 'wrap' },
   section: { gap: 16, paddingTop: 8 },
   sectionLabel: { paddingHorizontal: spacing.screen },
   list: { paddingHorizontal: spacing.screen },
-  card: { width: 150, gap: 8 },
-  cardTitle: {
-    color: colors.cream,
-    fontFamily: fonts.serif,
-    fontSize: 17,
-    marginTop: 2,
-  },
-  cardRating: { gap: 6 },
+  card: { width: 150 },
 });

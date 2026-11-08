@@ -1,0 +1,10 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": ["test", "dev", "src/services", "src/api/types.ts"],
+  "exclude": ["node_modules", "src/services/appStorage.ts"]
+}

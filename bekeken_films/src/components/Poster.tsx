@@ -1,34 +1,39 @@
-import React from 'react';
-import { StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
+import React, { useState } from 'react';
+import { Image, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { colors, radius } from '../theme';
-import type { Movie } from '../data/movies';
+import { colors, fonts, radius } from '../theme';
 
 type Props = {
-  movie: Movie;
+  uri: string | null;
+  title: string;
   style?: StyleProp<ViewStyle>;
-  glyphSize?: number;
   rounded?: number;
 };
 
-// Poster placeholder: gradiente + glifo. Proporção 2:3 por padrão.
-export function Poster({ movie, style, glyphSize = 48, rounded = radius.md }: Props) {
+// Pôster 2:3. Sem imagem (ou se falhar ao carregar), mostra um placeholder com a inicial.
+export function Poster({ uri, title, style, rounded = radius.md }: Props) {
+  const [failed, setFailed] = useState(false);
+  const showImage = !!uri && !failed;
   return (
     <View style={[styles.wrap, { borderRadius: rounded }, style]}>
       <LinearGradient
-        colors={movie.poster}
-        start={{ x: 0.2, y: 0 }}
-        end={{ x: 0.8, y: 1 }}
+        colors={['#5A2C20', '#2A130E']}
         style={StyleSheet.absoluteFill}
       />
-      <View style={styles.center}>
-        <Text style={{ fontSize: glyphSize, opacity: 0.9 }}>{movie.glyph}</Text>
-      </View>
-      {/* escurece a base, dá clima de cinema */}
-      <LinearGradient
-        colors={['transparent', 'rgba(10,4,4,0.55)']}
-        style={StyleSheet.absoluteFill}
-      />
+      {!showImage && (
+        <View style={styles.center}>
+          <Text style={styles.initial}>{title.trim().charAt(0).toUpperCase()}</Text>
+        </View>
+      )}
+      {showImage && (
+        <Image
+          source={{ uri }}
+          style={StyleSheet.absoluteFill}
+          resizeMode="cover"
+          onError={() => setFailed(true)}
+          accessibilityLabel={`Pôster de ${title}`}
+        />
+      )}
     </View>
   );
 }
@@ -41,9 +46,6 @@ const styles = StyleSheet.create({
     borderColor: colors.borderSoft,
     backgroundColor: colors.surface,
   },
-  center: {
-    ...StyleSheet.absoluteFill,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  center: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
+  initial: { color: colors.textMuted, fontFamily: fonts.serif, fontSize: 40, opacity: 0.7 },
 });

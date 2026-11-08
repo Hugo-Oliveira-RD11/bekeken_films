@@ -1,12 +1,15 @@
 import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { api } from '../api/client';
+import type { WatchedResponse } from '../api/types';
+import { useApi } from '../api/useApi';
+import { Poster } from '../components/Poster';
 import { Screen } from '../components/Screen';
-import { PageHeader } from '../components/Title';
 import { StatCard } from '../components/StatCard';
 import { Stars } from '../components/Stars';
-import { Poster } from '../components/Poster';
-import { getMovie, stats, watched, type WatchedEntry } from '../data/movies';
+import { EmptyState, ErrorBox, Loading } from '../components/States';
+import { PageHeader } from '../components/Title';
 import { colors, fonts } from '../theme';
 
 const MONTHS = [
@@ -14,14 +17,14 @@ const MONTHS = [
   'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
 ];
 
-type Group = { key: string; label: string; entries: WatchedEntry[] };
+type Entry = WatchedResponse['entries'][number];
+type Group = { key: string; label: string; entries: Entry[] };
 
-// Agrupa as entradas por mês, do mais recente para o mais antigo.
-function groupByMonth(entries: WatchedEntry[]): Group[] {
-  const sorted = [...entries].sort((a, b) => b.date.localeCompare(a.date));
+// O backend já devolve do mais recente para o mais antigo; só agrupamos por mês.
+function groupByMonth(entries: Entry[]): Group[] {
   const groups: Group[] = [];
-  for (const entry of sorted) {
-    const [year, month] = entry.date.split('-').map(Number);
+  for (const entry of entries) {
+    const [year, month] = entry.watchedAt.split('-').map(Number);
     const key = `${year}-${month}`;
     let group = groups.find((g) => g.key === key);
     if (!group) {
@@ -35,54 +38,73 @@ function groupByMonth(entries: WatchedEntry[]): Group[] {
 
 export function AssistidosScreen() {
   const navigation = useNavigation();
-  const groups = useMemo(() => groupByMonth(watched), []);
+  const { data, error, loading, reload } = useApi(() => api.watched());
+  const groups = useMemo(() => (data ? groupByMonth(data.entries) : []), [data]);
 
   return (
     <Screen>
       <PageHeader eyebrow="Seu diário" title="Assistidos" />
 
-      <View style={styles.stats}>
-        <StatCard label="Filmes" value={stats.total} />
-        <StatCard label="Este ano" value={stats.thisYear} />
-        <StatCard label="Nota média" value={stats.average.toFixed(1)} accent />
-      </View>
+      {loading && <Loading />}
+      {error && !data && <ErrorBox message={error} onRetry={reload} />}
 
-      {groups.map((group) => (
-        <View key={group.key} style={styles.group}>
-          <Text style={styles.month}>{group.label}</Text>
-          {group.entries.map((entry) => {
-            const movie = getMovie(entry.movieId);
-            const [, , day] = entry.date.split('-');
-            const monthIdx = Number(entry.date.split('-')[1]) - 1;
-            return (
-              <Pressable
-                key={entry.id}
-                style={({ pressed }) => [styles.row, pressed && { opacity: 0.8 }]}
-                onPress={() => navigation.navigate('Detalhes', { movieId: movie.id })}
-              >
-                <View style={styles.date}>
-                  <Text style={styles.day}>{day}</Text>
-                  <Text style={styles.dayMonth}>
-                    {MONTHS[monthIdx].slice(0, 3).toUpperCase()}
-                  </Text>
-                </View>
-                <Poster movie={movie} style={styles.thumb} glyphSize={26} rounded={8} />
-                <View style={styles.info}>
-                  <Text style={styles.title} numberOfLines={2}>
-                    {movie.title}
-                  </Text>
-                  <Text style={styles.meta} numberOfLines={2}>
-                    {`${movie.year} · ${movie.director}`}
-                  </Text>
-                  <View style={{ marginTop: 6 }}>
-                    <Stars rating={entry.rating} size={14} gap={1} />
-                  </View>
-                </View>
-              </Pressable>
-            );
-          })}
-        </View>
-      ))}
+      {data && (
+        <>
+          <View style={styles.stats}>
+            <StatCard label="Filmes" value={data.stats.total} />
+            <StatCard label="Este ano" value={data.stats.thisYear} />
+            <StatCard
+              label="Nota média"
+              value={data.stats.average == null ? '—' : data.stats.average.toFixed(1)}
+              accent
+            />
+          </View>
+
+          {groups.length === 0 && (
+            <EmptyState
+              icon="eye-outline"
+              text="Você ainda não marcou nenhum filme como assistido. Abra um filme e toque em “Assistido”."
+            />
+          )}
+
+          {groups.map((group) => (
+            <View key={group.key} style={styles.group}>
+              <Text style={styles.month}>{group.label}</Text>
+              {group.entries.map((entry) => {
+                const [, m, day] = entry.watchedAt.split('-');
+                return (
+                  <Pressable
+                    key={entry.movie.id}
+                    style={({ pressed }) => [styles.row, pressed && { opacity: 0.8 }]}
+                    onPress={() => navigation.navigate('Detalhes', { movieId: entry.movie.id })}
+                  >
+                    <View style={styles.date}>
+                      <Text style={styles.day}>{day}</Text>
+                      <Text style={styles.dayMonth}>{MONTHS[Number(m) - 1].slice(0, 3).toUpperCase()}</Text>
+                    </View>
+                    <Poster uri={entry.movie.posterUrl} title={entry.movie.title} style={styles.thumb} rounded={8} />
+                    <View style={styles.info}>
+                      <Text style={styles.title} numberOfLines={2}>
+                        {entry.movie.title}
+                      </Text>
+                      <Text style={styles.meta} numberOfLines={1}>
+                        {entry.movie.year ?? ''}
+                      </Text>
+                      <View style={{ marginTop: 6 }}>
+                        {entry.rating != null ? (
+                          <Stars rating={entry.rating} size={14} gap={1} />
+                        ) : (
+                          <Text style={styles.meta}>Sem nota</Text>
+                        )}
+                      </View>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ))}
+        </>
+      )}
     </Screen>
   );
 }
@@ -98,12 +120,7 @@ const styles = StyleSheet.create({
   },
   row: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   date: { width: 42, alignItems: 'center' },
-  day: {
-    color: colors.gold,
-    fontFamily: fonts.serif,
-    fontSize: 30,
-    lineHeight: 34,
-  },
+  day: { color: colors.gold, fontFamily: fonts.serif, fontSize: 30, lineHeight: 34 },
   dayMonth: {
     color: colors.textMuted,
     fontFamily: fonts.sansMedium,
@@ -112,16 +129,6 @@ const styles = StyleSheet.create({
   },
   thumb: { width: 64 },
   info: { flex: 1 },
-  title: {
-    color: colors.cream,
-    fontFamily: fonts.serif,
-    fontSize: 20,
-    lineHeight: 24,
-  },
-  meta: {
-    color: colors.textMuted,
-    fontFamily: fonts.sans,
-    fontSize: 13,
-    marginTop: 2,
-  },
+  title: { color: colors.cream, fontFamily: fonts.serif, fontSize: 20, lineHeight: 24 },
+  meta: { color: colors.textMuted, fontFamily: fonts.sans, fontSize: 13, marginTop: 2 },
 });
