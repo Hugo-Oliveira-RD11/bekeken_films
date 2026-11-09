@@ -27,14 +27,17 @@ export interface Signal {
   rating: number | null;
 }
 
+/** Chave que identifica um título (ex.: "movie:101"); pode ser número em testes. */
+export type Id = string | number;
+
 export interface Candidate {
-  id: number;
+  id: Id;
   genres: string[];
   voteAverage: number;
 }
 
 export interface Scored {
-  id: number;
+  id: Id;
   /** Nota bruta (unidade do perfil). */
   score: number;
   /** 0–100: nota relativa ao gênero mais forte do perfil. null quando não há perfil. */

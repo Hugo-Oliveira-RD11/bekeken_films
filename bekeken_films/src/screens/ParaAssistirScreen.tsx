@@ -14,7 +14,7 @@ const OPTIONS: { value: Algorithm; label: string; hint: string }[] = [
   {
     value: 'count',
     label: 'Por gêneros',
-    hint: 'Conta os gêneros dos filmes que você curtiu.',
+    hint: 'Conta os gêneros dos títulos que você curtiu.',
   },
   {
     value: 'weighted',
@@ -32,7 +32,7 @@ export function ParaAssistirScreen() {
   return (
     <Screen>
       <PageHeader
-        eyebrow={`${movies.length} ${movies.length === 1 ? 'filme guardado' : 'filmes guardados'}`}
+        eyebrow={`${movies.length} ${movies.length === 1 ? 'título guardado' : 'títulos guardados'}`}
         title="Para assistir"
         subtitle="Sua sessão da próxima sexta começa aqui."
       />
@@ -40,11 +40,11 @@ export function ParaAssistirScreen() {
       {list.loading && <Loading />}
       {list.error && !list.data && <ErrorBox message={list.error} onRetry={list.reload} />}
       {list.data && movies.length === 0 && (
-        <EmptyState icon="bookmark-border" text="Nada guardado ainda. Toque em “Quero ver” em qualquer filme." />
+        <EmptyState icon="bookmark-border" text="Nada guardado ainda. Toque em “Quero ver” em qualquer filme ou série." />
       )}
       <View style={styles.grid}>
         {movies.map((m) => (
-          <MovieCard key={m.id} movie={m} style={styles.item} />
+          <MovieCard key={`${m.mediaType}:${m.id}`} movie={m} style={styles.item} showType />
         ))}
       </View>
 
@@ -75,7 +75,7 @@ export function ParaAssistirScreen() {
         <>
           {recs.data.coldStart ? (
             <Text style={styles.profile}>
-              Ainda não conhecemos seu gosto. Dê coração ou nota (3+) a alguns filmes e as sugestões
+              Ainda não conhecemos seu gosto. Dê coração ou nota (3+) a alguns filmes ou séries e as sugestões
               passam a combinar com você. Por enquanto, os mais bem avaliados:
             </Text>
           ) : (
@@ -92,9 +92,10 @@ export function ParaAssistirScreen() {
           <View style={styles.grid}>
             {recs.data.items.map((r) => (
               <MovieCard
-                key={r.movie.id}
+                key={`${r.movie.mediaType}:${r.movie.id}`}
                 movie={r.movie}
                 style={styles.item}
+                showType
                 badge={r.matchPercent != null ? `${r.matchPercent}% combina` : undefined}
                 caption={r.because.length ? `Porque você curte ${r.because.join(' e ')}` : undefined}
               />

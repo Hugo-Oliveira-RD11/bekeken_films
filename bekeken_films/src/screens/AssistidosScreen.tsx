@@ -51,7 +51,7 @@ export function AssistidosScreen() {
       {data && (
         <>
           <View style={styles.stats}>
-            <StatCard label="Filmes" value={data.stats.total} />
+            <StatCard label="Títulos" value={data.stats.total} />
             <StatCard label="Este ano" value={data.stats.thisYear} />
             <StatCard
               label="Nota média"
@@ -63,7 +63,7 @@ export function AssistidosScreen() {
           {groups.length === 0 && (
             <EmptyState
               icon="visibility"
-              text="Você ainda não marcou nenhum filme como assistido. Abra um filme e toque em “Assistido”."
+              text="Você ainda não marcou nenhum filme ou série como assistido. Abra um título e toque em “Já assisti”."
             />
           )}
 
@@ -74,9 +74,9 @@ export function AssistidosScreen() {
                 const [, m, day] = entry.watchedAt.split('-');
                 return (
                   <Pressable
-                    key={entry.movie.id}
+                    key={`${entry.movie.mediaType}:${entry.movie.id}`}
                     style={({ pressed }) => [styles.row, pressed && { opacity: 0.8 }]}
-                    onPress={() => navigation.navigate('Detalhes', { movieId: entry.movie.id })}
+                    onPress={() => navigation.navigate('Detalhes', { mediaType: entry.movie.mediaType, id: entry.movie.id })}
                   >
                     <View style={styles.date}>
                       <Text style={styles.day}>{day}</Text>
@@ -88,7 +88,7 @@ export function AssistidosScreen() {
                         {entry.movie.title}
                       </Text>
                       <Text style={styles.meta} numberOfLines={1}>
-                        {entry.movie.year ?? ''}
+                        {[entry.movie.year, entry.movie.mediaType === 'tv' ? 'Série' : null].filter(Boolean).join(' · ')}
                       </Text>
                       <View style={{ marginTop: 6 }}>
                         {entry.rating != null ? (

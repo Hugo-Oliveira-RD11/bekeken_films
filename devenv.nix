@@ -20,6 +20,7 @@
     typescript = {
       enable = true;
       lsp.enable = true;
+      lsp.package = pkgs.typescript-language-server;
     };
   };
 

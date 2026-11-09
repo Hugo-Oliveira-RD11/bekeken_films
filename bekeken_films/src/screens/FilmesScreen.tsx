@@ -3,7 +3,7 @@ import { FlatList, ImageBackground, StyleSheet, Text, View } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { api } from '../api/client';
-import type { HomeSectionKey, MovieSummary } from '../api/types';
+import type { HomeSectionKey, MediaType, MovieSummary } from '../api/types';
 import { useApi } from '../api/useApi';
 import { PrimaryButton, SecondaryButton } from '../components/Buttons';
 import { Eyebrow } from '../components/Eyebrow';
@@ -22,7 +22,7 @@ function Hero({ movie }: { movie: MovieSummary }) {
   const save = async () => {
     setSaving(true);
     try {
-      await api.updateMovie(movie.id, { status: 'watchlist' });
+      await api.updateTitle({ mediaType: movie.mediaType, id: movie.id }, { status: 'watchlist' });
       setSaved(true);
     } finally {
       setSaving(false);
@@ -53,7 +53,7 @@ function Hero({ movie }: { movie: MovieSummary }) {
           <PrimaryButton
             label="Ver detalhes"
             icon="play-arrow"
-            onPress={() => navigation.navigate('Detalhes', { movieId: movie.id })}
+            onPress={() => navigation.navigate('Detalhes', { mediaType: movie.mediaType, id: movie.id })}
           />
           <SecondaryButton
             label={saved ? 'Na lista' : 'Quero ver'}
@@ -67,27 +67,32 @@ function Hero({ movie }: { movie: MovieSummary }) {
   );
 }
 
-export function FilmesScreen() {
-  const { data, error, loading, reload } = useApi(() => api.home());
+/** Home de filmes ou de séries (mesmo layout, listas diferentes). */
+function HomeScreen({ mediaType }: { mediaType: MediaType }) {
+  const { data, error, loading, reload } = useApi(() => api.home(mediaType), [mediaType]);
+  const text = SECTION_TEXT[mediaType];
 
   return (
-    <Screen hero={data?.featured ? <Hero movie={data.featured} /> : undefined} padded={false}>
+    <Screen
+      hero={data?.featured ? <Hero key={`${data.featured.mediaType}:${data.featured.id}`} movie={data.featured} /> : undefined}
+      padded={false}
+    >
       {loading && <Loading />}
       {error && !data && <ErrorBox message={error} onRetry={reload} />}
       {data && data.sections.length === 0 && (
-        <EmptyState icon="movie" text="Nenhum filme para mostrar agora." />
+        <EmptyState icon={mediaType === 'tv' ? 'tv' : 'movie'} text={`Nenhum${mediaType === 'tv' ? 'a série' : ' filme'} para mostrar agora.`} />
       )}
       {data?.sections.map((section) => (
         <View key={section.key} style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Eyebrow>{SECTION_TEXT[section.key].title}</Eyebrow>
-            <Text style={styles.sectionHint}>{SECTION_TEXT[section.key].hint}</Text>
+            <Eyebrow>{text[section.key].title}</Eyebrow>
+            <Text style={styles.sectionHint}>{text[section.key].hint}</Text>
           </View>
           <FlatList
             data={section.movies}
             horizontal
             showsHorizontalScrollIndicator={false}
-            keyExtractor={(m) => String(m.id)}
+            keyExtractor={(m) => `${m.mediaType}:${m.id}`}
             contentContainerStyle={styles.list}
             ItemSeparatorComponent={() => <View style={{ width: 14 }} />}
             renderItem={({ item }) => <MovieCard movie={item} style={styles.card} />}
@@ -98,13 +103,24 @@ export function FilmesScreen() {
   );
 }
 
+export const FilmesScreen = () => <HomeScreen mediaType="movie" />;
+export const SeriesScreen = () => <HomeScreen mediaType="tv" />;
+
 // Títulos das seções. O TMDB não informa "quantas vezes foi assistido", então
 // "Mais assistidos" usa a popularidade dele e "Mais gostados" as maiores notas.
-const SECTION_TEXT: Record<HomeSectionKey, { title: string; hint: string }> = {
-  nowPlaying: { title: 'Em cartaz', hint: 'nos cinemas agora' },
-  mostWatched: { title: 'Mais assistidos', hint: 'popularidade no TMDB' },
-  topRated: { title: 'Mais gostados', hint: 'maiores notas no TMDB' },
-  trending: { title: 'Em alta', hint: 'esta semana' },
+const SECTION_TEXT: Record<MediaType, Record<HomeSectionKey, { title: string; hint: string }>> = {
+  movie: {
+    nowPlaying: { title: 'Em cartaz', hint: 'nos cinemas agora' },
+    mostWatched: { title: 'Mais assistidos', hint: 'popularidade no TMDB' },
+    topRated: { title: 'Mais gostados', hint: 'maiores notas no TMDB' },
+    trending: { title: 'Em alta', hint: 'esta semana' },
+  },
+  tv: {
+    nowPlaying: { title: 'No ar', hint: 'episódios novos esta semana' },
+    mostWatched: { title: 'Mais assistidas', hint: 'popularidade no TMDB' },
+    topRated: { title: 'Mais gostadas', hint: 'maiores notas no TMDB' },
+    trending: { title: 'Em alta', hint: 'esta semana' },
+  },
 };
 
 const styles = StyleSheet.create({

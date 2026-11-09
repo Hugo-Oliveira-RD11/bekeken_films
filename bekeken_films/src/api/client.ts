@@ -20,14 +20,5 @@ const config = loadConfig({
 
 export const library = createLibrary(config, appStorage);
 
-// Mesmos nomes de antes, então as telas não precisam mudar.
-export const api = {
-  home: () => library.home(),
-  search: (q: string) => library.search(q),
-  movie: (id: number) => library.movie(id),
-  updateMovie: library.updateMovie,
-  watched: () => library.watched(),
-  watchlist: () => library.watchlist(),
-  recommendations: (algorithm: Parameters<typeof library.recommendations>[0]) =>
-    library.recommendations(algorithm),
-};
+/** Tudo que as telas usam (filmes, séries e episódios). */
+export const api = library;

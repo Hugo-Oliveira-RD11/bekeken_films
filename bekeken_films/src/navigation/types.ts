@@ -1,7 +1,9 @@
 import type { NavigatorScreenParams } from '@react-navigation/native';
+import type { MediaType } from '../api/types';
 
 export type TabParamList = {
   Filmes: undefined;
+  Series: undefined;
   Assistidos: undefined;
   ParaAssistir: undefined;
 };
@@ -9,7 +11,9 @@ export type TabParamList = {
 export type RootStackParamList = {
   Tabs: NavigatorScreenParams<TabParamList> | undefined;
   Buscar: undefined;
-  Detalhes: { movieId: number };
+  /** Filme ou série (tipo + id do TMDB: ids de filme e série podem coincidir). */
+  Detalhes: { mediaType: MediaType; id: number };
+  Episodio: { seriesId: number; season: number; episode: number };
 };
 
 declare global {

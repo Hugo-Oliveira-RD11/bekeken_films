@@ -24,6 +24,9 @@ const G = {
   comedy: [35, 'Comédia'],
   adventure: [12, 'Aventura'],
   thriller: [53, 'Thriller'],
+  fantasy: [14, 'Fantasia'],
+  war: [10752, 'Guerra'],
+  mystery: [9648, 'Mistério'],
 } as const satisfies Record<string, [number, string]>;
 
 export const FAKE_MOVIES: FakeMovie[] = [
@@ -45,6 +48,53 @@ export const FAKE_MOVIES: FakeMovie[] = [
 
 const GENRE_LIST = Object.values(G).map(([id, name]) => ({ id, name }));
 const WM_ID = (tmdbId: number) => tmdbId + 9000;
+const WM_TV_ID = (tmdbId: number) => tmdbId + 19000;
+
+// Séries usam alguns gêneros "compostos" que só existem no TMDB de séries.
+const TV_GENRE_LIST = [
+  { id: 18, name: 'Drama' },
+  { id: 80, name: 'Crime' },
+  { id: 9648, name: 'Mistério' },
+  { id: 35, name: 'Comédia' },
+  { id: 10759, name: 'Action & Adventure' },
+  { id: 10765, name: 'Sci-Fi & Fantasy' },
+  { id: 10768, name: 'War & Politics' },
+];
+const TV = {
+  drama: [18, 'Drama'],
+  crime: [80, 'Crime'],
+  mystery: [9648, 'Mistério'],
+  comedy: [35, 'Comédia'],
+  action: [10759, 'Action & Adventure'],
+  scifi: [10765, 'Sci-Fi & Fantasy'],
+} as const satisfies Record<string, [number, string]>;
+
+interface FakeSeries {
+  id: number;
+  name: string;
+  year: number;
+  genres: [number, string][];
+  vote: number;
+  creators: string[];
+  /** episódios por temporada (temporada 1, 2, ...) */
+  seasons: number[];
+  /** episódios da temporada 0 ("Especiais"), se houver */
+  specials?: number;
+  runtime: number;
+  colors: [string, string];
+  cast: string[];
+}
+
+// O id 101 repete o de um FILME ("Duas Luas") de propósito: filme e série não podem colidir.
+export const FAKE_SERIES: FakeSeries[] = [
+  { id: 101, name: 'Ecos de Neon', year: 2024, genres: [TV.scifi, TV.drama], vote: 8.5, creators: ['Rin Okada'], seasons: [4, 3], specials: 1, runtime: 48, colors: ['#1B1033', '#E04AA0'], cast: ['Aki Mori', 'Dante Cruz', 'Lia Park'] },
+  { id: 201, name: 'Última Fronteira', year: 2023, genres: [TV.action, TV.drama], vote: 8.2, creators: ['Marco Villa', 'Ines Pardo'], seasons: [5], runtime: 52, colors: ['#3B2A10', '#D8A24A'], cast: ['Bruno Faro', 'Teo Lins'] },
+  { id: 202, name: 'Casa de Papel Branco', year: 2022, genres: [TV.crime, TV.mystery], vote: 8.9, creators: ['Elsa Brandt'], seasons: [3, 3], runtime: 44, colors: ['#0E1A24', '#B8C4CC'], cast: ['Maya Torres', 'Joel Vaz'] },
+  { id: 203, name: 'Meia-Noite no Café', year: 2021, genres: [TV.comedy, TV.drama], vote: 7.8, creators: ['Yui Sato'], seasons: [4], runtime: 28, colors: ['#1D1020', '#D08A9A'], cast: ['Nina Alba', 'Gui Prado'] },
+  { id: 204, name: 'Cidade Submersa', year: 2025, genres: [TV.scifi, TV.mystery], vote: 7.4, creators: ['Otto Lang'], seasons: [3], runtime: 55, colors: ['#08202B', '#3FA0B8'], cast: ['Vera Holm', 'Ravi Nair'] },
+  { id: 205, name: 'Os Herdeiros', year: 2020, genres: [TV.drama, TV.crime], vote: 8.0, creators: ['Paula Reis'], seasons: [4, 4], runtime: 58, colors: ['#2A0A10', '#C0504D'], cast: ['Sol Mendes', 'Caio Ferraz'] },
+  { id: 206, name: 'Nova Era', year: 2024, genres: [TV.action], vote: 6.9, creators: ['Ken Doyle'], seasons: [3], runtime: 42, colors: ['#10131F', '#6E7BA8'], cast: ['Ana Dias', 'Leo Prado'] },
+];
 
 export interface Stub {
   url: string;
@@ -74,6 +124,28 @@ export async function startStub(port = 0): Promise<Stub> {
     genre_ids: m.genres.map(([id]) => id),
   });
 
+  const seriesItem = (t: FakeSeries) => ({
+    id: t.id,
+    name: t.name,
+    overview: `Sinopse de ${t.name}: uma série sobre segredos, família e o que vem depois.`,
+    first_air_date: `${t.year}-03-10`,
+    poster_path: `/tp${t.id}.svg`,
+    backdrop_path: `/tb${t.id}.svg`,
+    vote_average: t.vote,
+    genre_ids: t.genres.map(([id]) => id),
+  });
+
+  const episodeItem = (t: FakeSeries, season: number, ep: number) => ({
+    season_number: season,
+    episode_number: ep,
+    name: `${t.name}: S${season}E${ep}`,
+    overview: `Sinopse do episódio ${ep} da temporada ${season} de ${t.name}.`,
+    air_date: `${t.year + Math.max(season - 1, 0)}-02-${String(ep).padStart(2, '0')}`,
+    runtime: t.runtime,
+    still_path: `/s${t.id}_${season}_${ep}.svg`,
+    vote_average: 7 + (ep % 3) * 0.5,
+  });
+
   const server: Server = createServer((req, res) => {
     const url = new URL(req.url ?? '/', 'http://stub');
     const path = url.pathname;
@@ -88,9 +160,10 @@ export async function startStub(port = 0): Promise<Stub> {
     }
 
     // Imagens (SVG em gradiente)
-    const img = path.match(/^\/img\/\w+\/([pb])(\d+)\.svg$/);
+    const img = path.match(/^\/img\/\w+\/(p|b|tp|tb|s)(\d+)(?:_\d+_\d+)?\.svg$/);
     if (img) {
-      const m = FAKE_MOVIES.find((x) => x.id === Number(img[2]));
+      const isTv = ['tp', 'tb', 's'].includes(img[1]);
+      const m = isTv ? FAKE_SERIES.find((x) => x.id === Number(img[2])) : FAKE_MOVIES.find((x) => x.id === Number(img[2]));
       const [c1, c2] = m?.colors ?? ['#222', '#888'];
       res.writeHead(200, { 'content-type': 'image/svg+xml' });
       res.end(
@@ -119,6 +192,76 @@ export async function startStub(port = 0): Promise<Stub> {
         const q = (url.searchParams.get('query') ?? '').toLowerCase();
         return json(res, { results: FAKE_MOVIES.filter((m) => m.title.toLowerCase().includes(q)).map(listItem) });
       }
+      // ---- séries ----
+      if (p === '/genre/tv/list') return json(res, { genres: TV_GENRE_LIST });
+      if (['/tv/on_the_air', '/tv/popular', '/tv/top_rated', '/trending/tv/week'].includes(p)) {
+        const page = Number(url.searchParams.get('page') ?? 1);
+        const all = p.endsWith('top_rated') ? [...FAKE_SERIES].sort((a, b) => b.vote - a.vote) : FAKE_SERIES;
+        return json(res, { page, results: all.slice((page - 1) * 10, page * 10).map(seriesItem) });
+      }
+      if (p === '/search/multi') {
+        const q = (url.searchParams.get('query') ?? '').toLowerCase();
+        return json(res, {
+          results: [
+            ...FAKE_MOVIES.filter((m) => m.title.toLowerCase().includes(q)).map((m) => ({ ...listItem(m), media_type: 'movie' })),
+            ...FAKE_SERIES.filter((t) => t.name.toLowerCase().includes(q)).map((t) => ({ ...seriesItem(t), media_type: 'tv' })),
+            { id: 999, media_type: 'person', name: 'Fulano de Tal' }, // pessoas devem ser ignoradas
+          ],
+        });
+      }
+      const tvSeason = p.match(/^\/tv\/(\d+)\/season\/(\d+)$/);
+      if (tvSeason) {
+        const t = FAKE_SERIES.find((x) => x.id === Number(tvSeason[1]));
+        const n = Number(tvSeason[2]);
+        const count = n === 0 ? t?.specials : t?.seasons[n - 1];
+        if (!t || !count) return json(res, { status_message: 'não encontrado' }, 404);
+        return json(res, {
+          season_number: n,
+          name: n === 0 ? 'Especiais' : `Temporada ${n}`,
+          air_date: `${t.year + Math.max(n - 1, 0)}-01-15`,
+          poster_path: `/tp${t.id}.svg`,
+          episodes: Array.from({ length: count }, (_, i) => episodeItem(t, n, i + 1)),
+        });
+      }
+      const tvEp = p.match(/^\/tv\/(\d+)\/season\/(\d+)\/episode\/(\d+)$/);
+      if (tvEp) {
+        const t = FAKE_SERIES.find((x) => x.id === Number(tvEp[1]));
+        const n = Number(tvEp[2]);
+        const e = Number(tvEp[3]);
+        const count = n === 0 ? t?.specials : t?.seasons[n - 1];
+        if (!t || !count || e < 1 || e > count) return json(res, { status_message: 'não encontrado' }, 404);
+        return json(res, {
+          ...episodeItem(t, n, e),
+          crew: [{ name: 'Diretor ' + t.creators[0], job: 'Director' }, { name: 'Roteirista X', job: 'Writer' }],
+          guest_stars: [
+            { name: 'Convidado Um', character: 'Vizinho', order: 0, profile_path: null },
+            { name: 'Convidada Dois', character: 'Detetive', order: 1, profile_path: null },
+          ],
+        });
+      }
+      const tvId = p.match(/^\/tv\/(\d+)$/);
+      if (tvId) {
+        const t = FAKE_SERIES.find((x) => x.id === Number(tvId[1]));
+        if (!t) return json(res, { status_message: 'não encontrado' }, 404);
+        return json(res, {
+          ...seriesItem(t),
+          genres: t.genres.map(([id, name]) => ({ id, name })),
+          tagline: 'Uma série para maratonar.',
+          vote_count: 4321,
+          episode_run_time: [t.runtime],
+          created_by: t.creators.map((name) => ({ name })),
+          number_of_episodes: t.seasons.reduce((a, b) => a + b, 0),
+          seasons: [
+            ...(t.specials ? [{ season_number: 0, name: 'Especiais', episode_count: t.specials, air_date: null, poster_path: null }] : []),
+            ...t.seasons.map((c, i) => ({ season_number: i + 1, name: `Temporada ${i + 1}`, episode_count: c, air_date: `${t.year + i}-01-15`, poster_path: `/tp${t.id}.svg` })),
+          ],
+          external_ids: { imdb_id: `tt${t.id}777` },
+          credits: {
+            cast: t.cast.map((name, order) => ({ name, character: `Personagem ${order + 1}`, order, profile_path: null })),
+            crew: [],
+          },
+        });
+      }
       const mv = p.match(/^\/movie\/(\d+)$/);
       if (mv) {
         const m = FAKE_MOVIES.find((x) => x.id === Number(mv[1]));
@@ -143,6 +286,10 @@ export async function startStub(port = 0): Promise<Stub> {
       const p = path.slice('/wm'.length);
       if (p === '/search/') {
         const id = Number(url.searchParams.get('search_value'));
+        const field = url.searchParams.get('search_field');
+        if (field === 'tmdb_tv_id') {
+          return json(res, { title_results: FAKE_SERIES.some((t) => t.id === id) ? [{ id: WM_TV_ID(id) }] : [] });
+        }
         return json(res, { title_results: FAKE_MOVIES.some((m) => m.id === id) ? [{ id: WM_ID(id) }] : [] });
       }
       if (p === '/sources/') {
@@ -153,7 +300,10 @@ export async function startStub(port = 0): Promise<Stub> {
         ]);
       }
       const det = p.match(/^\/title\/(\d+)\/details\/$/);
-      if (det) return json(res, { id: Number(det[1]), user_rating: 7.6, critic_score: 79 });
+      if (det) {
+        const isSeries = Number(det[1]) >= 19000; // ids de séries no Watchmode do stub
+        return json(res, { id: Number(det[1]), user_rating: isSeries ? 8.4 : 7.6, critic_score: isSeries ? 88 : 79 });
+      }
       const src = p.match(/^\/title\/(\d+)\/sources\/$/);
       if (src) {
         return json(res, [

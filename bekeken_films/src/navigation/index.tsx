@@ -10,11 +10,12 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Icon, type IconName } from '../components/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { FilmesScreen } from '../screens/FilmesScreen';
+import { FilmesScreen, SeriesScreen } from '../screens/FilmesScreen';
 import { AssistidosScreen } from '../screens/AssistidosScreen';
 import { ParaAssistirScreen } from '../screens/ParaAssistirScreen';
 import { DetalhesScreen } from '../screens/DetalhesScreen';
 import { BuscarScreen } from '../screens/BuscarScreen';
+import { EpisodioScreen } from '../screens/EpisodioScreen';
 import { colors, fonts, radius } from '../theme';
 import type { RootStackParamList, TabParamList } from './types';
 
@@ -41,14 +42,20 @@ const linking: LinkingOptions<RootStackParamList> = {
       Tabs: {
         screens: {
           Filmes: 'filmes',
+          Series: 'series',
           Assistidos: 'assistidos',
           ParaAssistir: 'para-assistir',
         },
       },
       Buscar: 'buscar',
+      // filme e série têm ids separados no TMDB, então o tipo faz parte do endereço
       Detalhes: {
-        path: 'filme/:movieId',
-        parse: { movieId: Number },
+        path: 'titulo/:mediaType/:id',
+        parse: { id: Number },
+      },
+      Episodio: {
+        path: 'serie/:seriesId/temporada/:season/episodio/:episode',
+        parse: { seriesId: Number, season: Number, episode: Number },
       },
     },
   },
@@ -63,6 +70,7 @@ const tabs: {
 }[] = [
   // Material Icons. Aba ativa = ícone preenchido (+ cor dourada); inativa = contorno.
   { name: 'Filmes', label: 'Filmes', icon: 'movie', iconActive: 'movie', component: FilmesScreen },
+  { name: 'Series', label: 'Séries', icon: 'tv', iconActive: 'tv', component: SeriesScreen },
   { name: 'Assistidos', label: 'Assistidos', icon: 'check-circle-outline', iconActive: 'check-circle', component: AssistidosScreen },
   { name: 'ParaAssistir', label: 'Para assistir', icon: 'bookmark-border', iconActive: 'bookmark', component: ParaAssistirScreen },
 ];
@@ -115,6 +123,7 @@ export function RootNavigator() {
         <Stack.Screen name="Tabs" component={Tabs} />
         <Stack.Screen name="Buscar" component={BuscarScreen} />
         <Stack.Screen name="Detalhes" component={DetalhesScreen} />
+        <Stack.Screen name="Episodio" component={EpisodioScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
@@ -130,7 +139,7 @@ const styles = StyleSheet.create({
   tabItem: { paddingVertical: 2 },
   tabLabel: { fontFamily: fonts.sansMedium, fontSize: 11, letterSpacing: 0.3 },
   iconPill: {
-    paddingHorizontal: 18,
+    paddingHorizontal: 14,
     paddingVertical: 4,
     borderRadius: radius.pill,
   },

@@ -33,10 +33,10 @@ export function Screen({ children, padded = true, hero }: Props) {
           onPress={() => navigation.navigate('Buscar')}
           style={styles.search}
           accessibilityRole="search"
-          accessibilityLabel="Buscar filmes"
+          accessibilityLabel="Buscar filmes e séries"
         >
           <Icon name="search" size={15} color={colors.textMuted} />
-          <Text style={styles.searchText}>Buscar filmes...</Text>
+          <Text style={styles.searchText}>Buscar...</Text>
         </Pressable>
       </View>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>

@@ -14,21 +14,28 @@ type Props = {
   caption?: string;
   /** Selo no canto do pôster (ex.: "87% match"). */
   badge?: string;
+  /** Mostra o selo "SÉRIE" (use onde filmes e séries aparecem misturados). */
+  showType?: boolean;
 };
 
 // Pôster + título + estrelas (média do TMDB) + nota. Ao tocar, abre os detalhes.
-export function MovieCard({ movie, style, caption, badge }: Props) {
+export function MovieCard({ movie, style, caption, badge, showType }: Props) {
   const navigation = useNavigation();
   return (
     <Pressable
       style={({ pressed }) => [styles.card, style, pressed && { opacity: 0.8 }]}
-      onPress={() => navigation.navigate('Detalhes', { movieId: movie.id })}
+      onPress={() => navigation.navigate('Detalhes', { mediaType: movie.mediaType, id: movie.id })}
     >
       <View>
         <Poster uri={movie.posterUrl} title={movie.title} />
         {badge ? (
           <View style={styles.badge}>
             <Text style={styles.badgeText}>{badge}</Text>
+          </View>
+        ) : null}
+        {showType && movie.mediaType === 'tv' ? (
+          <View style={styles.typeTag}>
+            <Text style={styles.typeText}>SÉRIE</Text>
           </View>
         ) : null}
       </View>
@@ -64,5 +71,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
   },
+  typeTag: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(30,14,11,0.85)',
+    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+  },
+  typeText: { color: colors.creamBright, fontFamily: fonts.sansSemi, fontSize: 10, letterSpacing: 1.2 },
   badgeText: { color: colors.goldLight, fontFamily: fonts.sansSemi, fontSize: 11 },
 });

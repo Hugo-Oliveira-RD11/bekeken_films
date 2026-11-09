@@ -66,7 +66,7 @@ export function BuscarScreen() {
           <TextInput
             value={query}
             onChangeText={setQuery}
-            placeholder="Buscar filmes..."
+            placeholder="Buscar filmes e séries..."
             placeholderTextColor={colors.textDim}
             style={styles.text}
             autoFocus
@@ -87,7 +87,7 @@ export function BuscarScreen() {
         {loading && <Loading />}
         {error && <ErrorBox message={error} />}
         {!loading && !error && results === null && (
-          <EmptyState icon="search" text="Digite o nome de um filme para buscar." />
+          <EmptyState icon="search" text="Digite o nome de um filme ou série para buscar." />
         )}
         {!loading && !error && results?.length === 0 && (
           <EmptyState icon="movie" text={`Nada encontrado para “${query.trim()}”.`} />
@@ -95,7 +95,13 @@ export function BuscarScreen() {
         {!loading && !error && results && results.length > 0 && (
           <View style={styles.grid}>
             {results.map((m) => (
-              <MovieCard key={m.id} movie={m} style={styles.item} caption={m.year ? String(m.year) : undefined} />
+              <MovieCard
+                key={`${m.mediaType}:${m.id}`}
+                movie={m}
+                style={styles.item}
+                showType
+                caption={m.year ? String(m.year) : undefined}
+              />
             ))}
           </View>
         )}

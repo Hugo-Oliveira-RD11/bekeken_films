@@ -1,4 +1,4 @@
-import type { SourceType, StreamingSource, WatchmodeInfo } from '../api/types';
+import type { SourceType, StreamingSource, TitleRef, WatchmodeInfo } from '../api/types';
 import { Cache, DAY, HOUR } from './cache';
 import type { Config } from './config';
 import { getJson, HttpError } from './http';
@@ -43,12 +43,15 @@ export class Watchmode {
     return getJson<T>(url);
   }
 
-  /** TMDB id -> id interno do Watchmode (cache de 30 dias; "não achei" dura 1 dia). */
-  private resolveId(tmdbId: number): Promise<number | null> {
-    return this.cache.getOrFetch(`wm:id:${tmdbId}`, { ttlMs: 30 * DAY, nullTtlMs: DAY }, async () => {
+  /**
+   * (tipo + id do TMDB) -> id interno do Watchmode (cache de 30 dias; "não achei" dura 1 dia).
+   * Filmes e séries usam campos de busca diferentes (tmdb_movie_id / tmdb_tv_id).
+   */
+  private resolveId(ref: TitleRef): Promise<number | null> {
+    return this.cache.getOrFetch(`wm:id:${ref.mediaType}:${ref.id}`, { ttlMs: 30 * DAY, nullTtlMs: DAY }, async () => {
       const raw = await this.request<RawSearch>('/search/', {
-        search_field: 'tmdb_movie_id',
-        search_value: String(tmdbId),
+        search_field: ref.mediaType === 'tv' ? 'tmdb_tv_id' : 'tmdb_movie_id',
+        search_value: String(ref.id),
       });
       return raw.title_results?.[0]?.id ?? null;
     });
@@ -66,13 +69,13 @@ export class Watchmode {
    * Onde assistir + notas. Nunca lança: se o Watchmode falhar (limite de uso, sem rede),
    * devolve status "unavailable" e a tela segue funcionando só com o TMDB.
    */
-  async info(tmdbId: number): Promise<WatchmodeInfo> {
+  async info(ref: TitleRef): Promise<WatchmodeInfo> {
     const region = this.cfg.region;
     const base: WatchmodeInfo = { status: 'ok', region, userRating: null, criticScore: null, sources: [] };
     if (!this.configured) return { ...base, status: 'no_key' };
 
     try {
-      const wmId = await this.resolveId(tmdbId);
+      const wmId = await this.resolveId(ref);
       if (wmId == null) return { ...base, status: 'not_found' };
 
       const [details, rawSources, logos] = await Promise.all([
@@ -95,7 +98,7 @@ export class Watchmode {
       };
     } catch (err) {
       const status = err instanceof HttpError ? err.status : 0;
-      console.warn(`[watchmode] indisponível para tmdb ${tmdbId} (${status || 'rede'}):`, (err as Error).message);
+      console.warn(`[watchmode] indisponível para ${ref.mediaType}:${ref.id} (${status || 'rede'}):`, (err as Error).message);
       return { ...base, status: 'unavailable' };
     }
   }

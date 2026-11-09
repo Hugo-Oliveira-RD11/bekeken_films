@@ -1,4 +1,14 @@
-import type { Status, UserMovie, UserMoviePatch, WatchedResponse } from '../api/types';
+import type {
+  EpisodeRef,
+  MediaType,
+  Status,
+  TitleRef,
+  UserEpisode,
+  UserEpisodePatch,
+  UserMovie,
+  UserMoviePatch,
+  WatchedResponse,
+} from '../api/types';
 import type { KeyValueStore } from './storage';
 
 export class ValidationError extends Error {
@@ -10,11 +20,30 @@ export class ValidationError extends Error {
 
 export type UserStats = WatchedResponse['stats'];
 
-const KEY = 'user:movies:v1';
+// Filmes e séries ficam juntos (a chave inclui o tipo, então ids iguais não colidem).
+// Episódios ficam em outra chave de armazenamento.
+const MOVIES_KEY = 'user:movies:v1';
+const EPISODES_KEY = 'user:episodes:v1';
 const MAX_NOTE = 5000;
 
-export const emptyUserMovie = (tmdbId: number): UserMovie => ({
-  tmdbId,
+/** Chave estável de um título: "movie:101" ou "tv:101". */
+export const refKey = (ref: TitleRef): string => `${ref.mediaType}:${ref.id}`;
+export const episodeKey = (r: EpisodeRef): string => `tv:${r.seriesId}:s${r.season}e${r.episode}`;
+
+export const emptyUserMovie = (ref: TitleRef): UserMovie => ({
+  mediaType: ref.mediaType,
+  tmdbId: ref.id,
+  status: null,
+  rating: null,
+  liked: false,
+  note: '',
+  watchedAt: null,
+});
+
+export const emptyUserEpisode = (ref: EpisodeRef): UserEpisode => ({
+  seriesId: ref.seriesId,
+  season: ref.season,
+  episode: ref.episode,
   status: null,
   rating: null,
   liked: false,
@@ -35,12 +64,92 @@ function validDate(s: string): boolean {
   return date.getFullYear() === y && date.getMonth() === m - 1 && date.getDate() === d;
 }
 
+interface Core {
+  status: Status | null;
+  rating: number | null;
+  liked: boolean;
+  note: string;
+  watchedAt: string | null;
+}
+interface CorePatch {
+  status?: Status | null;
+  rating?: number | null;
+  liked?: boolean;
+  note?: string;
+  watchedAt?: string;
+}
+
 /**
- * Dados pessoais: nota, "assistido/quero ver", coração e anotações.
- * Ficam SÓ no aparelho (AsyncStorage) — não há login nem servidor, então ninguém mais vê.
+ * Regras de edição, iguais para filmes/séries e episódios:
+ * - marcar assistido grava a data de hoje; dar nota marca como assistido;
+ * - desmarcar (status null) limpa nota e data;
+ * - "quero ver" em algo já assistido é ignorado (não apaga a nota).
+ * Episódios não têm "quero ver" (allowWatchlist = false).
+ */
+function applyPatch<T extends Core>(cur: T, patch: CorePatch, today: string, allowWatchlist: boolean): T {
+  const next: T = { ...cur };
+
+  if (patch.watchedAt !== undefined && !validDate(patch.watchedAt)) {
+    throw new ValidationError('A data deve ser válida (aaaa-mm-dd).');
+  }
+  if ('status' in patch) {
+    const s = patch.status;
+    const ok = s === null || s === 'watched' || (allowWatchlist && s === 'watchlist');
+    if (!ok) {
+      throw new ValidationError(
+        allowWatchlist ? "status deve ser 'watched', 'watchlist' ou null" : "status deve ser 'watched' ou null",
+      );
+    }
+    if (s === 'watchlist' && cur.status === 'watched') {
+      next.status = 'watched'; // toque errado não apaga a nota nem a data
+    } else {
+      next.status = s ?? null;
+      if (next.status === 'watched') {
+        next.watchedAt = patch.watchedAt ?? cur.watchedAt ?? today;
+      } else {
+        next.watchedAt = null;
+        next.rating = null;
+      }
+    }
+  } else if (patch.watchedAt !== undefined && next.status === 'watched') {
+    next.watchedAt = patch.watchedAt;
+  }
+  if ('rating' in patch) {
+    const r = patch.rating;
+    if (r !== null && r !== undefined) {
+      if (typeof r !== 'number' || !Number.isFinite(r) || r < 0.5 || r > 5 || (r * 2) % 1 !== 0) {
+        throw new ValidationError('A nota deve ser de 0.5 a 5, em passos de 0.5.');
+      }
+      next.rating = r;
+      if (next.status !== 'watched') {
+        next.status = 'watched';
+        next.watchedAt = patch.watchedAt ?? today;
+      }
+    } else {
+      next.rating = null;
+    }
+  }
+  if (patch.liked !== undefined) {
+    if (typeof patch.liked !== 'boolean') throw new ValidationError('liked deve ser boolean');
+    next.liked = patch.liked;
+  }
+  if (patch.note !== undefined) {
+    if (typeof patch.note !== 'string') throw new ValidationError('A anotação deve ser texto.');
+    if (patch.note.length > MAX_NOTE) throw new ValidationError(`A anotação passa de ${MAX_NOTE} caracteres.`);
+    next.note = patch.note;
+  }
+  return next;
+}
+
+const isEmpty = (c: Core) => !c.status && c.rating == null && !c.liked && c.note.trim() === '';
+
+/**
+ * Dados pessoais: nota, "assistido/quero ver", coração e anotações — de filmes, séries
+ * e episódios. Ficam SÓ no aparelho (AsyncStorage): não há login nem servidor.
  */
 export class UserData {
-  private data: Map<number, UserMovie> | null = null;
+  private titles: Map<string, UserMovie> | null = null;
+  private episodes: Map<string, UserEpisode> | null = null;
   private writes: Promise<void> = Promise.resolve();
 
   constructor(
@@ -48,135 +157,95 @@ export class UserData {
     private now: () => Date = () => new Date(),
   ) {}
 
-  private async load(): Promise<Map<number, UserMovie>> {
-    if (this.data) return this.data;
-    const map = new Map<number, UserMovie>();
+  private async loadJson<T>(key: string): Promise<T[]> {
     try {
-      const raw = await this.store.getItem(KEY);
-      if (raw) for (const m of JSON.parse(raw) as UserMovie[]) map.set(m.tmdbId, m);
+      const raw = await this.store.getItem(key);
+      return raw ? (JSON.parse(raw) as T[]) : [];
     } catch (err) {
       console.warn('[userdata] não consegui ler os dados salvos:', err);
+      return [];
     }
-    // Se duas chamadas carregarem ao mesmo tempo, a primeira a terminar vence.
-    this.data ??= map;
-    return this.data;
   }
 
-  private persist(map: Map<number, UserMovie>): Promise<void> {
-    const json = JSON.stringify([...map.values()]);
-    // Serializa as gravações para a última sempre vencer.
-    const run = this.writes.then(() => this.store.setItem(KEY, json));
+  private async loadTitles(): Promise<Map<string, UserMovie>> {
+    if (this.titles) return this.titles;
+    const map = new Map<string, UserMovie>();
+    // Dados salvos antes de existirem séries não têm mediaType: eram todos filmes.
+    for (const m of await this.loadJson<Partial<UserMovie> & { tmdbId: number }>(MOVIES_KEY)) {
+      const full = { ...emptyUserMovie({ mediaType: m.mediaType ?? 'movie', id: m.tmdbId }), ...m } as UserMovie;
+      full.mediaType = m.mediaType ?? 'movie';
+      map.set(refKey({ mediaType: full.mediaType, id: full.tmdbId }), full);
+    }
+    this.titles ??= map; // se duas chamadas carregarem juntas, a primeira a terminar vence
+    return this.titles;
+  }
+
+  private async loadEpisodes(): Promise<Map<string, UserEpisode>> {
+    if (this.episodes) return this.episodes;
+    const map = new Map<string, UserEpisode>();
+    for (const e of await this.loadJson<UserEpisode>(EPISODES_KEY)) map.set(episodeKey(e), e);
+    this.episodes ??= map;
+    return this.episodes;
+  }
+
+  /** Serializa as gravações (a última sempre vence). */
+  private persist(key: string, values: unknown[]): Promise<void> {
+    const json = JSON.stringify(values);
+    const run = this.writes.then(() => this.store.setItem(key, json));
     this.writes = run.catch(() => undefined);
     return run;
   }
 
-  async get(tmdbId: number): Promise<UserMovie> {
-    const map = await this.load();
-    return { ...(map.get(tmdbId) ?? emptyUserMovie(tmdbId)) };
+  // ---------- Filmes e séries ----------
+
+  async get(ref: TitleRef): Promise<UserMovie> {
+    const map = await this.loadTitles();
+    return { ...(map.get(refKey(ref)) ?? emptyUserMovie(ref)) };
   }
 
-  /** Atualização parcial; só os campos enviados mudam. */
-  async patch(tmdbId: number, patch: UserMoviePatch): Promise<UserMovie> {
-    const map = await this.load();
-    const cur = map.get(tmdbId) ?? emptyUserMovie(tmdbId);
-    const next: UserMovie = { ...cur };
-    const today = localDate(this.now());
+  async patch(ref: TitleRef, patch: UserMoviePatch): Promise<UserMovie> {
+    const map = await this.loadTitles();
+    const key = refKey(ref);
+    const cur = map.get(key) ?? emptyUserMovie(ref);
+    const next = applyPatch(cur, patch, localDate(this.now()), true);
 
-    if (patch.watchedAt !== undefined && !validDate(patch.watchedAt)) {
-      throw new ValidationError('A data deve ser válida (aaaa-mm-dd).');
-    }
-    if ('status' in patch) {
-      const s = patch.status;
-      if (s !== null && s !== 'watched' && s !== 'watchlist') {
-        throw new ValidationError("status deve ser 'watched', 'watchlist' ou null");
-      }
-      if (s === 'watchlist' && cur.status === 'watched') {
-        // "Quero ver" num filme já assistido não faz sentido: mantém como assistido
-        // (assim um toque errado não apaga a nota nem a data).
-        next.status = 'watched';
-      } else {
-        next.status = s ?? null;
-        if (next.status === 'watched') {
-          next.watchedAt = patch.watchedAt ?? cur.watchedAt ?? today;
-        } else {
-          // Saiu de "assistido" (status null): a nota e a data deixam de fazer sentido.
-          next.watchedAt = null;
-          next.rating = null;
-        }
-      }
-    } else if (patch.watchedAt !== undefined && next.status === 'watched') {
-      next.watchedAt = patch.watchedAt;
-    }
-    if ('rating' in patch) {
-      const r = patch.rating;
-      if (r !== null && r !== undefined) {
-        if (typeof r !== 'number' || !Number.isFinite(r) || r < 0.5 || r > 5 || (r * 2) % 1 !== 0) {
-          throw new ValidationError('A nota deve ser de 0.5 a 5, em passos de 0.5.');
-        }
-        next.rating = r;
-        // Dar nota implica que o filme foi assistido.
-        if (next.status !== 'watched') {
-          next.status = 'watched';
-          next.watchedAt = patch.watchedAt ?? today;
-        }
-      } else {
-        next.rating = null;
-      }
-    }
-    if (patch.liked !== undefined) {
-      if (typeof patch.liked !== 'boolean') throw new ValidationError('liked deve ser boolean');
-      next.liked = patch.liked;
-    }
-    if (patch.note !== undefined) {
-      if (typeof patch.note !== 'string') throw new ValidationError('A anotação deve ser texto.');
-      if (patch.note.length > MAX_NOTE) {
-        throw new ValidationError(`A anotação passa de ${MAX_NOTE} caracteres.`);
-      }
-      next.note = patch.note;
-    }
-
-    const empty = !next.status && next.rating == null && !next.liked && next.note.trim() === '';
-    const hadBefore = map.has(tmdbId);
-    if (empty) map.delete(tmdbId);
-    else map.set(tmdbId, next);
-
+    const had = map.get(key);
+    if (isEmpty(next)) map.delete(key);
+    else map.set(key, next);
     try {
-      await this.persist(map);
-    } catch (err) {
-      // Não conseguiu gravar no aparelho: desfaz na memória para não mostrar algo que não ficou salvo.
-      if (hadBefore) map.set(tmdbId, cur);
-      else map.delete(tmdbId);
+      await this.persist(MOVIES_KEY, [...map.values()]);
+    } catch {
+      if (had) map.set(key, had);
+      else map.delete(key);
       throw new Error('Não foi possível salvar no aparelho (armazenamento cheio?).');
     }
-    return empty ? emptyUserMovie(tmdbId) : { ...next };
+    return isEmpty(next) ? emptyUserMovie(ref) : { ...next };
   }
 
   /** watched: mais recentes primeiro; watchlist: adicionados por último primeiro. */
   async list(status: Status): Promise<UserMovie[]> {
-    const map = await this.load();
+    const map = await this.loadTitles();
     const items = [...map.values()].filter((m) => m.status === status);
-    if (status === 'watched') {
-      items.sort((a, b) => (b.watchedAt ?? '').localeCompare(a.watchedAt ?? ''));
-    } else {
-      items.reverse(); // Map mantém a ordem de inserção
-    }
+    if (status === 'watched') items.sort((a, b) => (b.watchedAt ?? '').localeCompare(a.watchedAt ?? ''));
+    else items.reverse(); // Map mantém a ordem de inserção
     return items;
   }
 
-  /** Tudo que alimenta o perfil de gosto: curtidos ou com nota. */
+  /** Tudo que alimenta o perfil de gosto: filmes e séries curtidos ou com nota (episódios não entram). */
   async signals(): Promise<UserMovie[]> {
-    const map = await this.load();
+    const map = await this.loadTitles();
     return [...map.values()].filter((m) => m.liked || m.rating != null);
   }
 
-  /** IDs que o usuário já tem em alguma lista (para não recomendar de novo). */
-  async knownIds(): Promise<Set<number>> {
-    const map = await this.load();
-    return new Set([...map.values()].filter((m) => m.status !== null).map((m) => m.tmdbId));
+  /** Chaves ("movie:1", "tv:1") que o usuário já tem em alguma lista (para não recomendar de novo). */
+  async knownKeys(): Promise<Set<string>> {
+    const map = await this.loadTitles();
+    return new Set([...map.values()].filter((m) => m.status !== null).map((m) => refKey({ mediaType: m.mediaType, id: m.tmdbId })));
   }
 
+  /** Estatísticas do diário (filmes e séries; episódios não contam). */
   async stats(): Promise<UserStats> {
-    const map = await this.load();
+    const map = await this.loadTitles();
     const year = String(this.now().getFullYear());
     const watched = [...map.values()].filter((m) => m.status === 'watched');
     const ratings = watched.map((m) => m.rating).filter((r): r is number => r != null);
@@ -187,4 +256,44 @@ export class UserData {
       average: average == null ? null : Math.round(average * 10) / 10,
     };
   }
+
+  // ---------- Episódios (separados da série) ----------
+
+  async getEpisode(ref: EpisodeRef): Promise<UserEpisode> {
+    const map = await this.loadEpisodes();
+    return { ...(map.get(episodeKey(ref)) ?? emptyUserEpisode(ref)) };
+  }
+
+  async patchEpisode(ref: EpisodeRef, patch: UserEpisodePatch): Promise<UserEpisode> {
+    const map = await this.loadEpisodes();
+    const key = episodeKey(ref);
+    const cur = map.get(key) ?? emptyUserEpisode(ref);
+    const next = applyPatch(cur as UserEpisode & Core, patch, localDate(this.now()), false) as UserEpisode;
+
+    const had = map.get(key);
+    if (isEmpty(next)) map.delete(key);
+    else map.set(key, next);
+    try {
+      await this.persist(EPISODES_KEY, [...map.values()]);
+    } catch {
+      if (had) map.set(key, had);
+      else map.delete(key);
+      throw new Error('Não foi possível salvar no aparelho (armazenamento cheio?).');
+    }
+    return isEmpty(next) ? emptyUserEpisode(ref) : { ...next };
+  }
+
+  /** Dados pessoais dos episódios de uma temporada (só os que têm algo). */
+  async episodesOfSeason(seriesId: number, season: number): Promise<UserEpisode[]> {
+    const map = await this.loadEpisodes();
+    return [...map.values()].filter((e) => e.seriesId === seriesId && e.season === season);
+  }
+
+  /** Quantos episódios (sem especiais) da série estão marcados como assistidos. */
+  async watchedEpisodeCount(seriesId: number): Promise<number> {
+    const map = await this.loadEpisodes();
+    return [...map.values()].filter((e) => e.seriesId === seriesId && e.season > 0 && e.status === 'watched').length;
+  }
 }
+
+export type { MediaType };
