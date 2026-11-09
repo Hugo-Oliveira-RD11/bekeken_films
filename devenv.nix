@@ -24,4 +24,8 @@
     };
   };
 
+  android = {
+    enable = true;
+    reactNative.enable = true;
+  };
 }
