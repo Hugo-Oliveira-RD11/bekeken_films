@@ -8,6 +8,8 @@
 
 {
   packages = with pkgs;[
+    cmake
+    ninja
   ];
 
   # https://devenv.sh/languages/
@@ -27,5 +29,9 @@
   android = {
     enable = true;
     reactNative.enable = true;
+    platforms.version = [ "36" "37" ];
+    buildTools.version = [ "36.0.0" "37.0.0" ];
+    ndk.enable = true;
+    ndk.version = [ "27.1.12297006" ];
   };
 }

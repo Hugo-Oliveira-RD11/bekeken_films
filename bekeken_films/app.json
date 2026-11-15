@@ -11,7 +11,8 @@
       "backgroundColor": "#140A0A"
     },
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": false,
+      "bundleIdentifier": "com.anonymous.bekeken-films"
     },
     "android": {
       "adaptiveIcon": {
@@ -20,7 +21,8 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.anonymous.bekeken_films"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -28,6 +30,11 @@
     "plugins": [
       "expo-font",
       "expo-splash-screen"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "ed77b103-5ac2-404e-9469-31c9044d4b41"
+      }
+    }
   }
 }
